@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+  mysql-db:
+    image: mysql:5.7
+    container_name: mysql-db
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DATABASE_PASS}
+      MYSQL_DATABASE: ${DATABASE_NAME}
+      # Removed MYSQL_USER and MYSQL_PASSWORD to use only the root user
+    ports:
+      - "3307:3306"  # Host port 3307 mapped to container port 3306
+    volumes:
+      - db_data:/var/lib/mysql  # Persist MySQL data
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  django-app:
+    build: .
+    image: django-app
+    container_name: django-app
+    ports:
+      - "8000:8000"  # Host port 8000 mapped to container port 8000
+    env_file:
+      - .env  # Load environment variables from .env file
+    environment:
+      - DATABASE_NAME=${DATABASE_NAME}
+      - DATABASE_USER=root  # Use root as user
+      - DATABASE_PASS=${DATABASE_PASS}
+      - DATABASE_HOST=mysql-db  # Use service name as host
+      - DATABASE_PORT=3306  # Container port
+      - DJANGO_SECRET_KEY=${SECRET_KEY}
+      - DEBUG=${DEBUG}
+    depends_on:
+      mysql-db:
+        condition: service_healthy  # Wait until MySQL is healthy
+    volumes:
+      - .:/app  # Mount current directory to /app in container (useful for development)
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge  # Define a custom bridge network
+
+volumes:
+  db_data:
+    driver: local  # Use Docker's default local volume driver
+
